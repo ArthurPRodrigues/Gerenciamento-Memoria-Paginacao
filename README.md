@@ -1,0 +1,1 @@
+# Gerenciamento-de-Mem-ria-com-Pagina-o---SIstemas-Operacionais-
