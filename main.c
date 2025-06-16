@@ -8,11 +8,17 @@
 #define PAGE_SIZE 32
 #define MAX_PROCESS_SIZE 256
 
+void initialize_memory();
+void create_process(int process_id, int size);
+void print_page_table(int process_id);
+void list_all_processes();
+void show_physical_memory();
+
 // Estrutura do quadro de memória física
 typedef struct {
-    int process_id; //Processo utilizando essa memória física, -1 se vazio
-    int page_num; // Número da página, -1 se vazio
-    unsigned char data[PAGE_SIZE]; //Conteúdo
+    int process_id;
+    int page_num;
+    unsigned char data[PAGE_SIZE];
     bool is_free;
 } Frame;
 
@@ -30,72 +36,193 @@ typedef struct {
 } Process;
 
 // Gerenciador de memória vazia (Lista encadeada)
-typedef struct {
+typedef struct FreeFrameNode {
     int frame_num;
-    struct FreeFrameNode *next // próximo nó da lista
+    struct FreeFrameNode *next;
 } FreeFrameNode;
 
 // Variáveis globais
-Frame physical_memory [PHYSICAL_MEM_SIZE / PAGE_SIZE]; //cria um vetor chamado memória física
-FreeFrameNode *free_frames_list = NULL; //cria uma lista encadeada ainda vazia
-Process *processes[100]; //cria um array de 100 campos para processos
-int process_count = 0; //contador de processos
+Frame physical_memory[PHYSICAL_MEM_SIZE / PAGE_SIZE];
+FreeFrameNode *free_frames_list = NULL;
+Process *processes[100];
+int process_count = 0;
 
-// Inicializa memória e lista de quadros vazios
+
 void initialize_memory() {
     int total_frames = PHYSICAL_MEM_SIZE / PAGE_SIZE;
-
-    //Criando quadros vazios
-    for ( int i=0; i< total_frames ; i++) {
+    for (int i = 0; i < total_frames; i++) {
         physical_memory[i].is_free = true;
         physical_memory[i].process_id = -1;
         physical_memory[i].page_num = -1;
-        memset(physical_memory[i].data, 0, PAGE_SIZE); //o conteúdo dos blocos do quadro ficam algo como [0, 0, 0, 0, 0]
-    
+        memset(physical_memory[i].data, 0, PAGE_SIZE);
 
-        //Colocando esse quadros na lista de frames vazios
-        FreeFrameNode *new_node = (FreeFrameNode*)malloc(sizeof(FreeFrameNode)); // Reserva tal quantidade de bytes no heap (alocação dinâmica)
-        new_node->frame_num = i; //"->" é equivalente a um ".", mas dentro de uma struct
-        new_node->next = free_frames_list; //aponta para um outro nó da lista
-        free_frames_list = new_node; // início = new_node que voce acabou de criar
+        FreeFrameNode *new_node = (FreeFrameNode *)malloc(sizeof(FreeFrameNode));
+        new_node->frame_num = i;
+        new_node->next = free_frames_list;
+        free_frames_list = new_node;
     }
-
 
 }
 
-// Cria novo processo
 void create_process(int process_id, int size) {
 
-    // Checar se ID já existe
-    for (int i = 0; i< process_count; i++) {
+    for (int i = 0; i < process_count; i++) {
         if (processes[i]->process_id == process_id) {
-            printf("Error: process id %d already exists\n", process_id);
+            printf("Erro: processo %d já existe.\n", process_id);
             return;
         }
     }
 
-    // Checar se tamanho do processo é menor ou igual do que tamanho máximo permitido
     if (size > MAX_PROCESS_SIZE) {
-        printf("Error: process size %d exceeds maximum allowed size of %d bytes\n", size, MAX_PROCESS_SIZE);
+        printf("Erro: tamanho do processo excede o máximo permitido.\n");
         return;
     }
 
-    // Calcular o número de páginas necessárias para esse processo
     int page_count = size / PAGE_SIZE;
-    if (size % page_count != 0) page_count++; // parte de uma página precisa ficar em uma página a mais (não cheia) 
+    if (size % PAGE_SIZE != 0) page_count++;
 
-    // Checar se tem quadros disponíveis para essas páginas
-    int free_frames_count = 0; //contador de quadros vazios
+    int free_frames_count = 0;
     FreeFrameNode *current = free_frames_list;
     while (current != NULL) {
         free_frames_count++;
         current = current->next;
     }
 
-    if (free_frames_count = 0) {
-        printf("Error: not enough memory to allocate process.\nRequired: %d frames.\nAvailable: %d frames", page_count, free_frames_count);
+    if (free_frames_count < page_count) {
+        printf("Erro: memória insuficiente. Necessário: %d quadros. Disponível: %d.\n", page_count, free_frames_count);
         return;
     }
 
-    // Create new process
+    Process *new_process = (Process *)malloc(sizeof(Process));
+    new_process->process_id = process_id;
+    new_process->size = size;
+    new_process->page_count = page_count;
+    new_process->page_table = (PageTableEntry *)malloc(sizeof(PageTableEntry) * page_count);
+
+    for (int i = 0; i < page_count; i++) {
+        int frame_num = free_frames_list->frame_num;
+        FreeFrameNode *to_free = free_frames_list;
+        free_frames_list = free_frames_list->next;
+        free(to_free);
+
+        physical_memory[frame_num].is_free = false;
+        physical_memory[frame_num].process_id = process_id;
+        physical_memory[frame_num].page_num = i;
+
+        for (int j = 0; j < PAGE_SIZE; j++) {
+            physical_memory[frame_num].data[j] = rand() % 256;
+        }
+
+        new_process->page_table[i].frame_num = frame_num;
+    }
+
+    processes[process_count++] = new_process;
+    printf("Processo %d criado com sucesso (%d bytes, %d páginas).\n", process_id, size, page_count);
+}
+
+void print_page_table(int process_id) {
+    for (int i = 0; i < process_count; i++) {
+        if (processes[i]->process_id == process_id) {
+            Process *p = processes[i];
+            printf("\n===== Tabela de Páginas =====\n");
+            printf("Processo %d\n", p->process_id);
+            printf("Tamanho: %d bytes\n", p->size);
+            printf("Páginas: %d\n", p->page_count);
+            for (int j = 0; j < p->page_count; j++) {
+                printf("Página %d → Quadro %d\n", j, p->page_table[j].frame_num);
+            }
+            return;
+        }
+    }
+    printf("Erro: processo %d não encontrado.\n", process_id);
+}
+
+void list_all_processes() {
+    if (process_count == 0) {
+        printf("Nenhum processo criado.\n");
+        return;
+    }
+
+    printf("\n===== Lista de Processos =====\n");
+    for (int i = 0; i < process_count; i++) {
+        Process *p = processes[i];
+        printf("\nProcesso %d:\n", p->process_id);
+        printf("Tamanho: %d bytes | Páginas: %d\n", p->size, p->page_count);
+        for (int j = 0; j < p->page_count; j++) {
+            printf("  Página %d → Quadro %d\n", j, p->page_table[j].frame_num);
+        }
+    }
+}
+
+void show_physical_memory() {
+    int total_frames = PHYSICAL_MEM_SIZE / PAGE_SIZE;
+    printf("\n===== ESTADO DA MEMÓRIA FÍSICA =====\n");
+    for (int i = 0; i < total_frames; i++) {
+        if (physical_memory[i].is_free) {
+            printf("Quadro %02d: LIVRE\n", i);
+        } else {
+            printf("Quadro %02d: OCUPADO | Processo %d | Página %d\n",
+                   i,
+                   physical_memory[i].process_id,
+                   physical_memory[i].page_num);
+        }
+    }
+}
+
+// Função principal
+int main() {
+    srand(time(NULL));
+    initialize_memory();
+
+    int opcao, pid, size;
+
+    while (1) {
+        printf("\n===== MENU =====\n");
+        printf("1. Criar processo\n");
+        printf("2. Ver tabela de páginas\n");
+        printf("3. Ver memória lógica (todos os processos)\n");
+        printf("4. Ver memória física\n");
+        printf("0. Sair\n");
+
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+
+        if (opcao == 0) break;
+
+        switch (opcao) {
+            case 1:
+                printf("ID do processo: ");
+                scanf("%d", &pid);
+                printf("Tamanho do processo (em bytes): ");
+                scanf("%d", &size);
+                create_process(pid, size);
+                break;
+
+            case 2:
+                printf("ID do processo: ");
+                scanf("%d", &pid);
+                print_page_table(pid);
+                break;
+
+            case 3:
+                list_all_processes();
+                break;
+
+            case 4:
+                show_physical_memory();
+                break;
+
+            default:
+                printf("Opção inválida.\n");
+                break;
+        }
+    }
+
+    // Liberação de memória
+    for (int i = 0; i < process_count; i++) {
+        free(processes[i]->page_table);
+        free(processes[i]);
+    }
+
+    return 0;
 }
