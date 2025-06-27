@@ -4,10 +4,11 @@
 #include <time.h>
 #include <stdbool.h>
 
-#define PHYSICAL_MEM_SIZE 1024
-#define PAGE_SIZE 32
-#define MAX_PROCESS_SIZE 256
+int physical_mem_size;
+int page_size;
+int max_process_size;
 
+void preConfig();
 void initialize_memory();
 void create_process(int process_id, int size);
 void print_page_table(int process_id);
@@ -18,7 +19,7 @@ void show_physical_memory();
 typedef struct {
     int process_id;
     int page_num;
-    unsigned char data[PAGE_SIZE];
+    unsigned char* data;
     bool is_free;
 } Frame;
 
@@ -41,20 +42,56 @@ typedef struct FreeFrameNode {
     struct FreeFrameNode *next;
 } FreeFrameNode;
 
-// Variáveis globais
-Frame physical_memory[PHYSICAL_MEM_SIZE / PAGE_SIZE];
+Frame *physical_memory = NULL;
 FreeFrameNode *free_frames_list = NULL;
 Process *processes[100];
 int process_count = 0;
 
+void read_line(char *buffer, int size) {
+    if (fgets(buffer, size, stdin)) {
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len-1] == '\n')
+            buffer[len-1] = '\0';
+    }
+}
+
+int read_int_with_default(const char *prompt, int default_value) {
+    char buffer[100];
+    int value;
+    printf("%s", prompt);
+    read_line(buffer, sizeof(buffer));
+    if (strlen(buffer) == 0)
+        return default_value;
+    if (sscanf(buffer, "%d", &value) == 1)
+        return value;
+    return default_value;
+}
+
+void preConfig() {
+    physical_mem_size = read_int_with_default("Tamanho máximo da memória em bytes (padrão: 1024): ", 1024);
+    page_size = read_int_with_default("Tamanho da página em bytes (padrão: 32): ", 32);
+    max_process_size = read_int_with_default("Tamanho máximo do processo em bytes (padrão: 256): ", 256);
+}
 
 void initialize_memory() {
-    int total_frames = PHYSICAL_MEM_SIZE / PAGE_SIZE;
+    int total_frames = physical_mem_size / page_size;
+    physical_memory = (Frame *)malloc(sizeof(Frame) * total_frames);
+
+    if (!physical_memory) {
+        printf("Erro na alocação da memória física.\n");
+        exit(1);
+    }
+
     for (int i = 0; i < total_frames; i++) {
+        physical_memory[i].data = (unsigned char *)malloc(page_size);
+        if (!physical_memory[i].data) {
+            printf("Erro na alocação do buffer da página.\n");
+            exit(1);
+        }
         physical_memory[i].is_free = true;
         physical_memory[i].process_id = -1;
         physical_memory[i].page_num = -1;
-        memset(physical_memory[i].data, 0, PAGE_SIZE);
+        memset(physical_memory[i].data, 0, page_size);
 
         FreeFrameNode *new_node = (FreeFrameNode *)malloc(sizeof(FreeFrameNode));
         new_node->frame_num = i;
@@ -73,13 +110,13 @@ void create_process(int process_id, int size) {
         }
     }
 
-    if (size > MAX_PROCESS_SIZE) {
+    if (size > max_process_size) {
         printf("Erro: tamanho do processo excede o máximo permitido.\n");
         return;
     }
 
-    int page_count = size / PAGE_SIZE;
-    if (size % PAGE_SIZE != 0) page_count++;
+    int page_count = size / page_size;
+    if (size % page_size != 0) page_count++;
 
     int free_frames_count = 0;
     FreeFrameNode *current = free_frames_list;
@@ -109,7 +146,7 @@ void create_process(int process_id, int size) {
         physical_memory[frame_num].process_id = process_id;
         physical_memory[frame_num].page_num = i;
 
-        for (int j = 0; j < PAGE_SIZE; j++) {
+        for (int j = 0; j < page_size; j++) {
             physical_memory[frame_num].data[j] = rand() % 256;
         }
 
@@ -155,7 +192,7 @@ void list_all_processes() {
 }
 
 void show_physical_memory() {
-    int total_frames = PHYSICAL_MEM_SIZE / PAGE_SIZE;
+    int total_frames = physical_mem_size / page_size;
     printf("\n===== ESTADO DA MEMÓRIA FÍSICA =====\n");
     for (int i = 0; i < total_frames; i++) {
         if (physical_memory[i].is_free) {
@@ -172,6 +209,8 @@ void show_physical_memory() {
 // Função principal
 int main() {
     srand(time(NULL));
+
+    preConfig();
     initialize_memory();
 
     int opcao, pid, size;
@@ -218,10 +257,25 @@ int main() {
         }
     }
 
-    // Liberação de memória
+    // Liberação da memória alocada para os dados de cada frame
+    int total_frames = physical_mem_size / page_size;
+    for (int i = 0; i < total_frames; i++) {
+        free(physical_memory[i].data);
+    }
+    free(physical_memory);
+
+    // Liberação da memória dos processos
     for (int i = 0; i < process_count; i++) {
         free(processes[i]->page_table);
         free(processes[i]);
+    }
+
+    // Liberação da lista encadeada free_frames_list ===
+    while (free_frames_list != NULL) {
+        FreeFrameNode *temp = free_frames_list;
+        free_frames_list = free_frames_list->next;
+        free(temp); // Libera os ponteiros
+        temp = NULL;
     }
 
     return 0;
