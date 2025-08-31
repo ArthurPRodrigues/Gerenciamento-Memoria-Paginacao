@@ -1,4 +1,5 @@
-# Gerenciamento-de-Memoria-com-Paginacao-Sistemas-Operacionais
+# Gerenciamento de Memoria com Paginacao Sistemas Operacionais UFSC
+## Projeto desenvolvido durante a disciplina de Sistemas Operacionais do curso de Sistemas de Informação da Univerdade Federal de Santa Catarina (UFSC)
 
 ## Compilando o programa e executando o programa:
 
