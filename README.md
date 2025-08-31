@@ -1,80 +1,78 @@
-# Gerenciamento de Memoria com Paginacao Sistemas Operacionais UFSC
-## Projeto desenvolvido durante a disciplina de Sistemas Operacionais do curso de Sistemas de Informação da Univerdade Federal de Santa Catarina (UFSC)
+# Memory Management with Paging - Operating Systems UFSC
+## Project developed for the Operating Systems course of the Information Systems program at the Federal University of Santa Catarina (UFSC)
 
-## Compilando o programa e executando o programa:
+## Compiling and running the program:
 
-Rode no terminal do projeto os seguintes comandos:
-Para compilar:
+Run the following commands in the project's terminal:
+To compile:
 ```gcc main.c -o main```
 
-Para inicializar:
+To run:
 ```./main```
 
-## Detalhes da implementação:
+## Implementation Details:
 
-### 1. **Inicialização da Memória Física e Lógica**
-- Memória física: vetor `Frame` (global `physical_memory`).
-- Memória lógica é representada indiretamente pelas tabelas de páginas e pelos quadros físicos. A inicialização aleatória é feita nos quadros (em `create_process`).
-- **Função `initialize_memory()`**:
-        - Faz uma divisão da memória física em quadros de acordo com o tamanho de `PAGE_SIZE`.
-        - Dá um start em cada quadro como livre, sem processo associado e sem dados.
-        - Constrói uma linked list de quadros livres (`free_frames_list`)
+### 1. **Physical and Logical Memory Initialization**
+- Physical memory: `Frame` vector (global `physical_memory`).
+- Logical memory is indirectly represented by page tables and physical frames. Random initialization is done on the frames (in `create_process`).
+- **`initialize_memory()` function**:
+    - Divides the physical memory into frames according to the `PAGE_SIZE`.
+    - Starts each frame as free, with no associated process and no data.
+    - Builds a linked list of free frames (`free_frames_list`).
 
-### 2. **Estruturas de Dados**
-   - **Frame (Quadro)**: Uma struct/"objeto" que representa um quadro na memória física:
-        - `process_id`: Processo que ocupa o quadro.
-        - `page_num`: Número da página que está no quadro.
-        - `data`: Array de bytes
-        - `is_free`: Flag que indica a disponibilidade do quadro.
-        
+### 2. **Data Structures**
+- **Frame**: A struct/"object" that represents a frame in physical memory:
+    - `process_id`: The process occupying the frame.
+    - `page_num`: The page number stored in the frame.
+    - `data`: Byte array.
+    - `is_free`: Flag indicating the availability of the frame.
 
-### 3. **Criação de Processos**
-   - **Função `create_process(process_id, size)`**:
-        - Verifica duplicações em `process_id` e verifica se o tamanho do processo excede `MAX_PROCESS_SIZE`
-        - Calcula quantas páginas serão utilizadas (`page_count`).
-        - Verifica se há quadros livres suficientes em `free_frames_list`, uma lista que representa a alocação não contigua.
-        - Faz a alocação da estrutura do processo e da tabela de páginas.
-        - Para cada página:
-            - Remove um quadro da lista de quadros livres.
-            - Marca como ocupado, associando ao processo e à página.
-            - Preenche o quadro com valores aleatórios.
-            - Atualiza a tabela de páginas.
-        - Acrescenta este processo ao array em `processes`.
+### 3. **Process Creation**
+- **`create_process(process_id, size)` function**:
+    - Checks for duplicate `process_id`s and verifies if the process size exceeds `MAX_PROCESS_SIZE`.
+    - Calculates how many pages will be used (`page_count`).
+    - Checks if there are enough free frames in `free_frames_list`, a list representing non-contiguous allocation.
+    - Allocates the process structure and its page table.
+    - For each page:
+        - Removes a frame from the free frames list.
+        - Marks it as occupied, associating it with the process and page.
+        - Fills the frame with random values.
+        - Updates the page table.
+    - Adds this process to the `processes` array.
 
-### 4. **Visualização da implementação**
-   - **Função `print_page_table(process_id)`**:  
-        - Busca o processo através do seu `process_id`, exibindo seu tamanho e número de páginas. Exibe também o número do quadro físico.
-   - **Função `list_all_processes()`**:  
-        - Exibe uma listagem com os dados dos processos criados.
-   - **Função `show_physical_memory()`**:
-        - Avalia cada quadro na memória física, informando se ele está livre ou não. Quando estiver ocupado, informa o ID e número da página
-   - **Função `main()`**:
-        - Contém a interface do usuário com os botões para criar processo e verificar tabela de páginas, memória lógica e física.
+### 4. **Implementation Visualization**
+- **`print_page_table(process_id)` function**:
+    - Searches for the process by its `process_id`, displaying its size and number of pages. It also shows the physical frame number.
+- **`list_all_processes()` function**:
+    - Displays a list with the data of all created processes.
+- **`show_physical_memory()` function**:
+    - Evaluates each frame in physical memory, indicating whether it is free or not. When occupied, it shows the process ID and page number.
+- **`main()` function**:
+    - Contains the user interface with options to create a process and check the page table, logical memory, and physical memory.
 
-## Atendimento dos requisitos:
-**Ao inicializar, o sistema solicita estas 3 configurações**.
-   - 1. Configuração de Tamanho de Memória Física (padrão: 1024)
+## Meeting the requirements:
+**Upon initialization, the system prompts for these 3 settings:**
+- 1. Physical Memory Size Configuration (default: 1024)
+- 2. Page Size Configuration (default: 32)
+- 3. Maximum Process Size Configuration (default: 256)
 
-   - 2. Configuração de Tamanho da Página (padrão: 32): 
-   - 3. Configuração de Tamanho Máximo de um processo (padrão: 256)
+## Simulated Example
 
-## Exemplo simulado
+In the example below, we use the default settings (physical memory: 1024, page size: 32, max process size: 256) to simulate an insufficient memory error. The error occurred because the 5th process created with a size of 256 exceeds the total 1024 bytes:
 
-No exemplo abaixo, utilizamos as configurações padrão (memória física: 1024, tamanho de página: 32, tamanho max. do processo 256) para simular um erro de memória insuficiente. O erro ocorreu porque o 5° processo criado com tamanho 256 excede os 1024 bytes totais:
+![Insufficient Memory](images/MemoInsuficiente.png)
 
-![Memoria Insuficiente](images/MemoInsuficiente.png)
+In this other example, we can see process 1, which was created with a size of 256 and allocated to the respective pages/frames below.
 
-Neste outro exemplo, conseguimos visualizar o processo 1, que foi criado com tamanho 256 e alocado nas respectivas páginas/quadros abaixo.
+Using option **3.** from the menu returns a similar result, displaying all created processes.
 
-Utilizar a função **3.** do menu retorna um resultado semelhante, exibindo todos os preocessos criados.
+![Page Table](images/TabelaDePagProcesso1.png)
 
-![Tabela de Paginas](images/TabelaDePagProcesso1.png)
+Finally, it is possible to view the physical memory occupation through option **4.** in the menu.
 
-Por último, é possível visualizar a ocupação da memória física, através da função **4.** do menu.
+![Physical Memory](images/MemoFisica.png)
 
-![Memoria Fisica](images/MemoFisica.png)
-
-## Desenvolvido por:
+## Developed by:
 - Felipe Delduqui Alves Pinto Flávio (23100769)
 - Arthur Paulo Rodrigues (23100747)
 - Roberto Gabriel Ferreira (23100739)
